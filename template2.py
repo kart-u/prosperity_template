@@ -126,9 +126,9 @@ class Status:
         "RAINFOREST_RESIN": 50,
         "KELP": 50,
         "SQUID_INK": 50,
-        "CROISSANT": 250,
-        "JAM": 350,
-        "DJEMBE": 60,
+        "CROISSANTS": 250,
+        "JAMS": 350,
+        "DJEMBES": 60,
         "PICNIC_BASKET1": 60,
         "PICNIC_BASKET2": 100,
     }
@@ -552,6 +552,14 @@ class Status:
             return order_depth[price]
         else:
             return 0
+        
+    @property
+    def total_bidamt(self) -> int:
+        return sum(self._state.order_depths[self.product].buy_orders.values())
+
+    @property
+    def total_askamt(self) -> int:
+        return -sum(self._state.order_depths[self.product].sell_orders.values())
 
 
 
@@ -565,10 +573,11 @@ class Strategy:
         num_std_dev=state.worst_ask-state.best_bid
 
         # Ensure enough price history
-        if len(state.fair_price) < window:
+        mid_price=state.hist_mid_prc(window)
+        if len(mid_price) < window:
             return orders
 
-        prices = state.fair_price[-window:]
+        prices = mid_price[-window:]
         mean = np.mean(prices)
         std = np.std(prices)
 
@@ -636,4 +645,4 @@ class Trader:
 
 
 # testing script
-# prosperity3bt template.py 1 --data data/ --no-out --merge-pnl
+# prosperity3bt template2.py 2 --data data/ --no-out --merge-pnl
