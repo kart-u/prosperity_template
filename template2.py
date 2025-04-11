@@ -117,7 +117,8 @@ class Logger:
             return value
 
         return value[: max_length - 3] + "..."
-logger = Logger()
+# logger = Logger()
+
 
 # No need to see please do not change
 class Status:
@@ -134,7 +135,6 @@ class Status:
     }
 
     _state = None
-
     _realtime_position = {key:0 for key in _position_limit.keys()}
     # position of asset in real time
 
@@ -165,6 +165,7 @@ class Status:
 
         """
         self.product = product
+        self.ema_mid=[]
 
     @classmethod
     def cls_update(cls, state: TradingState) -> None:
@@ -206,6 +207,15 @@ class Status:
                 cnt += 1
 
         cls._num_data += 1
+    
+    def updates(self):
+        n=2/21
+        if(len(self.ema_mid)==0):
+            self.ema_mid.append(self.mid)
+        else:
+            num=self.ema_mid[-1]*(1-n)+n*self.mid
+            self.ema_mid.append(num)
+
         
     def hist_order_depth(self, type: str, depth: int, size) -> np.ndarray:
         """Return historical order depth.
@@ -382,12 +392,6 @@ class Status:
             volsum_array = volsum_array + np.where(bid_nan_idx, 0, tmp_bid_vol) - np.where(ask_nan_idx, 0, tmp_ask_vol)
                 
         return res_array / volsum_array
-    
-    # def hist_obs_bidPrice(self, size:int) -> np.ndarray:
-    #     return np.array(self._hist_observation['bidPrice'][-size:], dtype=np.float32)
-    
-    # def hist_obs_askPrice(self, size:int) -> np.ndarray:
-    #     return np.array(self._hist_observation['askPrice'][-size:], dtype=np.float32)
 
     @property
     def best_bid(self) -> int:
@@ -560,6 +564,18 @@ class Status:
     @property
     def total_askamt(self) -> int:
         return -sum(self._state.order_depths[self.product].sell_orders.values())
+    
+    def all_parameters(self):
+        return {
+            "best_bid":self.best_bid,
+            "best_ask":self.best_ask,
+            "vwap":self.hist_vwap_all(1)[0],
+            "mid_price":self.mid,
+            "possible_Buy":self.possible_buy_amt,
+            "possible_Sell":self.possible_sell_amt,
+            "timestamp":self.timestep*100,
+            "ema_20":self.ema_mid[-1]
+        }
 
 
 
@@ -588,19 +604,37 @@ class Strategy:
         # Buy when price is below lower band
         if current_price < lower_band:
             buy_amount = state.possible_buy_amt
-            orders.append(Order(state.product, state.best_ask, buy_amount))
-            executed_amount = min(buy_amount, state.total_askamt)
+            executed_amount = min(buy_amount, state.best_ask_amount)
+            orders.append(Order(state.product, state.best_ask, executed_amount))
             state.rt_position_update(state.rt_position + executed_amount)
 
         # Sell when price is above upper band
         elif current_price > upper_band:
             sell_amount = state.possible_sell_amt
-            orders.append(Order(state.product, state.best_bid, -sell_amount))
-            executed_amount = min(sell_amount, state.total_bidamt)
+            executed_amount = min(sell_amount, state.best_bid_amount)
+            orders.append(Order(state.product, state.best_bid, -executed_amount))
             state.rt_position_update(state.rt_position - executed_amount)
 
         return orders
+    
+    @staticmethod
+    def something(state:Status):
+        orders=[]
+        
+        if(state.best_ask>state.best_bid):
+            buy_amount = state.possible_buy_amt
+            executed_amount = min(buy_amount, state.best_ask_amount)
+            orders.append(Order(state.product, state.best_ask, executed_amount))
+            state.rt_position_update(state.rt_position + executed_amount)
 
+        else:
+            sell_amount = state.possible_sell_amt
+            executed_amount = min(sell_amount, state.best_bid_amount)
+            orders.append(Order(state.product, state.best_bid, -executed_amount))
+            state.rt_position_update(state.rt_position - executed_amount)
+
+
+        return orders
 
       
 class Trade:
@@ -608,10 +642,9 @@ class Trade:
     @staticmethod   
     def squidInk(state: Status) -> list[Order]:
         orders = []
-        # all strategies here....
 
-        # example call 
-        orders.extend(Strategy.bollinger_band(state=state))
+        # all strategies here....
+        orders.extend(Strategy.something(state=state))
 
         return orders
     
@@ -627,19 +660,30 @@ class Trade:
 class Trader:
     # here initialise a status class for asset
     state_squid = Status('SQUID_INK')
+    state_rain = Status('RAINFOREST_RESIN')
+    state_kelp = Status('KELP')
+    state_cross = Status('CROISSANTS')
+    state_jam = Status('JAMS')
+    state_djembe = Status('DJEMBES')
+    state_basket1 = Status('PICNIC_BASKET1')
+    state_basket2 = Status('PICNIC_BASKET2')
 
 
-    def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
+    def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, Any]:
         Status.cls_update(state)
-
+        
         result = {}
         conversions = 0
+        traderData={}
+        if "SQUID_INK" in state.order_depths.keys():
+            self.state_squid.updates()
+            result["SQUID_INK"] = Trade.squidInk(self.state_squid)
+            traderData = self.state_squid.all_parameters()
 
-        # call method from trade for corresponding asset
-        result["SQUID_INK"] = Trade.squidInk(self.state_squid)
 
-        traderData = "SAMPLE" 
-        logger.flush(state, result, conversions, traderData)
+        # when testing in local backtest comment out all logger instances
+        # logger.flush(state, result, conversions, traderData)
+
         return result, conversions, traderData
     
 
