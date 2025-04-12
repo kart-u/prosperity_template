@@ -25,7 +25,7 @@ trader = Trader()
 
 # Read the CSV data
 try:
-    df = pd.read_csv("data/round1/prices_round_1_day_-1.csv", delimiter=";")
+    df = pd.read_csv("data/round1/prices_round_1_day_-2.csv", delimiter=";")
 except FileNotFoundError:
     print("Error: prices_round_1_day_0.csv not found in data/round1/. Make sure the path is correct.")
     exit()

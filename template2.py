@@ -165,7 +165,8 @@ class Status:
 
         """
         self.product = product
-        self.ema_mid=[]
+        self.ema_mid_35=[]
+        self.ema_mid_100=[]
 
     @classmethod
     def cls_update(cls, state: TradingState) -> None:
@@ -209,12 +210,16 @@ class Status:
         cls._num_data += 1
     
     def updates(self):
-        n=2/21
-        if(len(self.ema_mid)==0):
-            self.ema_mid.append(self.mid)
+        n35=2/36
+        n100=2/101
+        if(len(self.ema_mid_35)==0):
+            self.ema_mid_35.append(self.mid)
+            self.ema_mid_100.append(self.mid)
         else:
-            num=self.ema_mid[-1]*(1-n)+n*self.mid
-            self.ema_mid.append(num)
+            num=self.ema_mid_35[-1]*(1-n35)+n35*self.mid
+            num2=self.ema_mid_100[-1]*(1-n100)+n100*self.mid
+            self.ema_mid_35.append(num)
+            self.ema_mid_100.append(num2)
 
         
     def hist_order_depth(self, type: str, depth: int, size) -> np.ndarray:
@@ -574,7 +579,8 @@ class Status:
             "possible_Buy":self.possible_buy_amt,
             "possible_Sell":self.possible_sell_amt,
             "timestamp":self.timestep*100,
-            "ema_20":self.ema_mid[-1]
+            "ema_35":self.ema_mid_35[-1],
+            "ema_100":self.ema_mid_100[-1],
         }
 
 
@@ -636,6 +642,24 @@ class Strategy:
 
         return orders
 
+    @staticmethod
+    def ema_crossover(state:Status):
+        orders=[]
+        if(len(state.ema_mid_35)>=2 and state.ema_mid_35[-1]>=state.ema_mid_100[-1] and state.ema_mid_35[-2]<state.ema_mid_100[-2]):
+            for price,amount in sorted(state.all_asks,reverse=False):
+                buy_amount = state.possible_buy_amt
+                executed_amount = min(buy_amount, abs(amount))
+                orders.append(Order(state.product, price, executed_amount))
+                state.rt_position_update(state.rt_position + executed_amount)
+
+        # if(len(state.ema_mid_35)>=2 and state.ema_mid_100[-1]>=state.ema_mid_35[-1] and state.ema_mid_35[-2]>state.ema_mid_100[-2]):
+        #     for price,amount in sorted(state.all_bids,reverse=True):
+        #         sell_amount = state.possible_sell_amt
+        #         executed_amount = min(sell_amount, amount)
+        #         orders.append(Order(state.product, price, -executed_amount))
+        #         state.rt_position_update(state.rt_position - executed_amount)          
+
+        return orders
       
 class Trade:
 
@@ -644,7 +668,7 @@ class Trade:
         orders = []
 
         # all strategies here....
-        orders.extend(Strategy.something(state=state))
+        orders.extend(Strategy.ema_crossover(state=state))
 
         return orders
     
@@ -689,4 +713,4 @@ class Trader:
 
 
 # testing script
-# prosperity3bt template2.py 2 --data data/ --no-out --merge-pnl
+# prosperity3bt template2.py 1-0 --data data/ --no-out --merge-pnl
